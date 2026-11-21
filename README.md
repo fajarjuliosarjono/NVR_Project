@@ -15,6 +15,8 @@ ADMIN_PASSWORD=rahasia JWT_SECRET=$(openssl rand -hex 32) npm start   # http://l
 ```
 
 ## Deploy (Docker)
+Di Ubuntu 20.04, pasang semua dependensi dulu: `sudo bash scripts/install-ubuntu20.sh` (Docker, Compose, rclone, git, firewall, matikan sleep).
+
 ```sh
 cp .env.example .env   # isi ADMIN_PASSWORD dan JWT_SECRET
 docker compose up -d --build
