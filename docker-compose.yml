@@ -32,8 +32,13 @@ services:
       RECORDER_URL: http://recorder:8081
       MEDIAMTX_HLS_URL: http://mediamtx:8888
       ADMIN_USER: ${ADMIN_USER:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?isi ADMIN_PASSWORD di .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}  # hanya dipakai untuk membuat admin awal
       JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di .env}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - api-state:/app/state   # users.json (daftar pengguna)
     ports:
       - "${BIND_ADDR:-127.0.0.1}:3000:3000"  # default hanya localhost; isi BIND_ADDR=0.0.0.0 untuk akses dari LAN
+
+volumes:
+  api-state:

@@ -27,6 +27,22 @@ UI di `127.0.0.1:3000`. Pasang reverse proxy HTTPS di depannya dan set `COOKIE_S
 ## Konfigurasi recorder
 `DATA_DIR`, `RECORDER_ADDR`, `MEDIAMTX_API`, `SEGMENT_SECONDS`, `RETENTION_DAYS`, `MAX_STORAGE_GB`, `LOCAL_BUFFER_HOURS`, `RCLONE_REMOTE`, `RCLONE_BIN`, `FFMPEG_BIN`.
 
+## Pengguna dan menu
+Menu UI: **Dashboard** (live semua kamera), **Rekaman** (flashdisk atau Google Drive, dengan rentang waktu), **Kamera**, **Pengguna**, **Ganti Password**.
+
+Role:
+| Role | Akses |
+|---|---|
+| `admin` (full akses) | Semua menu: tambah/hapus/start/stop kamera, kelola pengguna |
+| `viewer` (read only) | Dashboard, Rekaman (putar/unduh), Ganti Password |
+
+Pengguna disimpan di `users.json` (volume Docker `api-state`), password di-hash dengan scrypt. Saat pertama kali jalan dan belum ada pengguna, admin awal dibuat dari `ADMIN_USER` dan `ADMIN_PASSWORD` di `.env`. Setelah itu, nilai di `.env` tidak dipakai lagi; ganti password lewat menu **Ganti Password**. Mengganti atau mereset password otomatis mengeluarkan sesi lama pengguna itu.
+
+Lupa password admin satu-satunya: hapus `users.json` agar admin awal dibuat ulang dari `.env` (semua pengguna lain ikut terhapus):
+```sh
+docker compose exec api rm /app/state/users.json && docker compose restart api
+```
+
 ## Penyimpanan: buffer lokal + Google Drive (rclone)
 
 ### Cara kerja

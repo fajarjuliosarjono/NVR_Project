@@ -6,3 +6,5 @@ data/
 .DS_Store
 /recorder/recorder
 rclone/
+api/state/
+next_task.txt

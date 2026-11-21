@@ -347,8 +347,16 @@ func (a *App) routes() http.Handler {
 			to = time.Now().Unix() + 1
 		}
 		cam, _ := strconv.ParseInt(q.Get("camera_id"), 10, 64)
+		// location: "local" = ada di disk lokal (flashdisk), "drive" = sudah ada di Google Drive, kosong = semua.
+		loc := ""
+		switch q.Get("location") {
+		case "local":
+			loc = " AND local=1"
+		case "drive":
+			loc = " AND uploaded=1"
+		}
 		rows, err := a.db.Query(`SELECT id,camera_id,start,size,uploaded,local FROM recordings
-WHERE (?=0 OR camera_id=?) AND start>=? AND start<=? ORDER BY start DESC LIMIT 500`, cam, cam, from, to)
+WHERE (?=0 OR camera_id=?) AND start>=? AND start<=?`+loc+` ORDER BY start DESC LIMIT 1000`, cam, cam, from, to)
 		if err != nil {
 			httpErr(w, 500, err.Error())
 			return
