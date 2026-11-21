@@ -118,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_rec_cam_start ON recordings(camera_id, start);`)
 	// Migrasi untuk database lama; error "duplicate column" diabaikan.
 	a.db.Exec(`ALTER TABLE recordings ADD COLUMN uploaded INTEGER NOT NULL DEFAULT 0`)
 	a.db.Exec(`ALTER TABLE recordings ADD COLUMN local INTEGER NOT NULL DEFAULT 1`)
+	a.db.Exec(`UPDATE cameras SET rtsp_url=trim(rtsp_url), name=trim(name)`)
 	return nil
 }
 
@@ -138,7 +139,9 @@ func (a *App) runCamera(ctx context.Context, c Camera) {
 			"-hide_banner", "-loglevel", "error",
 			"-rtsp_transport", "tcp", "-timeout", "10000000",
 			"-i", c.RTSPURL,
-			"-c", "copy",
+			// Video disalin apa adanya; audio diubah ke AAC karena G.711 (umum di Hikvision/Dahua) tidak didukung MP4.
+			"-map", "0:v:0", "-map", "0:a:0?",
+			"-c:v", "copy", "-c:a", "aac", "-b:a", "32k",
 			"-f", "segment", "-segment_time", strconv.Itoa(a.cfg.SegmentSec),
 			"-segment_atclocktime", "1", "-reset_timestamps", "1",
 			"-strftime", "1",
@@ -226,8 +229,14 @@ func (a *App) indexOnce() {
 			return nil
 		}
 		info, err := d.Info()
-		if err != nil || time.Since(info.ModTime()) < 20*time.Second || info.Size() == 0 {
+		if err != nil || time.Since(info.ModTime()) < 20*time.Second {
 			return nil // masih ditulis
+		}
+		if info.Size() == 0 {
+			if time.Since(info.ModTime()) > time.Minute {
+				os.Remove(p) // sisa ffmpeg yang gagal
+			}
+			return nil
 		}
 		camID, err := strconv.ParseInt(filepath.Base(filepath.Dir(p)), 10, 64)
 		if err != nil {
@@ -280,7 +289,9 @@ func (a *App) routes() http.Handler {
 
 	mux.HandleFunc("POST /cameras", func(w http.ResponseWriter, r *http.Request) {
 		var in Camera
-		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in) != nil ||
+		err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in)
+		in.Name, in.RTSPURL = strings.TrimSpace(in.Name), strings.TrimSpace(in.RTSPURL)
+		if err != nil ||
 			strings.TrimSpace(in.Name) == "" || !strings.HasPrefix(in.RTSPURL, "rtsp") {
 			httpErr(w, 400, "name dan rtsp_url (rtsp:// atau rtsps://) wajib diisi")
 			return

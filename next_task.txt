@@ -1,0 +1,8 @@
+1. buatkan management user dengan previlege read only dan full akses
+2. pisahkan menu
+ - Dashboard langsung ke live view all kamera
+ - view recording
+    - recording yang ada di flashdisk dengan range waktu
+    - recording yang ada di gdrive dengan range waktu
+ - user management
+ - change password sendiri
