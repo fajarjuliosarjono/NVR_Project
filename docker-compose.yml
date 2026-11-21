@@ -1,0 +1,29 @@
+services:
+  recorder:
+    build: ./recorder
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+      SEGMENT_SECONDS: ${SEGMENT_SECONDS:-300}
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+      MAX_STORAGE_GB: ${MAX_STORAGE_GB:-0}
+      LOCAL_BUFFER_HOURS: ${LOCAL_BUFFER_HOURS:-24}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_CONFIG: /config/rclone.conf
+    volumes:
+      - ./data:/data
+      - ./rclone:/config   # berisi rclone.conf (tidak di-commit)
+    # Tidak dipublikasikan ke host: hanya bisa diakses oleh service api.
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on: [recorder]
+    environment:
+      RECORDER_URL: http://recorder:8081
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?isi ADMIN_PASSWORD di .env}
+      JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "127.0.0.1:3000:3000"  # taruh reverse proxy HTTPS (Caddy/Nginx) di depannya

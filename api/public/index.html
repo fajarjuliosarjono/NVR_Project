@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NVR</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#111;color:#eee}
+  header{display:flex;justify-content:space-between;padding:12px 16px;background:#1b1b1b}
+  main{padding:16px;max-width:1000px;margin:auto}
+  input,select,button{padding:8px;margin:4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
+  button{cursor:pointer}
+  table{width:100%;border-collapse:collapse;margin:8px 0}
+  td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
+  video{width:100%;max-height:60vh;background:#000}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<header><strong>NVR</strong><button id="logout" class="hide">Keluar</button></header>
+<main>
+  <form id="login">
+    <h3>Masuk</h3>
+    <input name="username" placeholder="Username" autocomplete="username"><br>
+    <input name="password" type="password" placeholder="Password" autocomplete="current-password"><br>
+    <button>Masuk</button> <span id="err"></span>
+  </form>
+
+  <section id="app" class="hide">
+    <h3>Kamera</h3>
+    <table id="cams"></table>
+    <form id="addCam">
+      <input name="name" placeholder="Nama" required>
+      <input name="rtsp_url" placeholder="rtsp://user:pass@ip:554/stream" size="40" required>
+      <button>Tambah</button>
+    </form>
+
+    <h3>Rekaman</h3>
+    <video id="player" controls></video>
+    <table id="recs"></table>
+  </section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const api = async (p, o = {}) => {
+  const r = await fetch(p, { headers: { 'Content-Type': 'application/json' }, ...o });
+  if (r.status === 401) { show(false); throw new Error('unauthorized'); }
+  if (r.status === 204) return null;
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+const text = (s) => document.createTextNode(s);
+function show(on) {
+  $('#login').classList.toggle('hide', on);
+  $('#app').classList.toggle('hide', !on);
+  $('#logout').classList.toggle('hide', !on);
+}
+function row(cells) {
+  const tr = document.createElement('tr');
+  for (const c of cells) { const td = document.createElement('td'); td.append(c); tr.append(td); }
+  return tr;
+}
+function btn(label, fn) { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; return b; }
+
+let cams = [];
+async function loadCams() {
+  cams = await api('/api/cameras');
+  const t = $('#cams'); t.replaceChildren();
+  for (const c of cams) {
+    t.append(row([text(c.name), text(c.rtsp_url), text(c.running ? 'merekam' : 'berhenti'),
+      btn(c.running ? 'Stop' : 'Start', async () => { await api(`/api/cameras/${c.id}/${c.running ? 'stop' : 'start'}`, { method: 'POST' }); loadCams(); }),
+      btn('Hapus', async () => { if (confirm('Hapus kamera?')) { await api(`/api/cameras/${c.id}`, { method: 'DELETE' }); loadCams(); } }),
+      btn('Rekaman', () => loadRecs(c.id))]));
+  }
+}
+async function loadRecs(camId) {
+  const recs = await api('/api/recordings?camera_id=' + camId);
+  const t = $('#recs'); t.replaceChildren();
+  for (const r of recs) {
+    t.append(row([text(new Date(r.start * 1000).toLocaleString()), text((r.size / 1048576).toFixed(1) + ' MB'), text(r.local ? (r.uploaded ? 'lokal + drive' : 'lokal') : 'drive'),
+      btn('Putar', () => { $('#player').src = `/api/recordings/${r.id}/file`; $('#player').play(); })]));
+  }
+}
+$('#login').onsubmit = async (e) => {
+  e.preventDefault();
+  try { await api('/auth/login', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(e.target))) }); init(); }
+  catch (x) { $('#err').textContent = x.message; }
+};
+$('#addCam').onsubmit = async (e) => {
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(e.target)); d.enabled = true;
+  try { await api('/api/cameras', { method: 'POST', body: JSON.stringify(d) }); e.target.reset(); loadCams(); } catch (x) { alert(x.message); }
+};
+$('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); show(false); };
+async function init() { try { await api('/auth/me'); show(true); loadCams(); } catch {} }
+init();
+</script>
+</body>
+</html>
