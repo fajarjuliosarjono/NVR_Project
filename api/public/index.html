@@ -4,60 +4,123 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NVR</title>
+<script>
+  // Terapkan tema sebelum render agar tidak berkedip. Pilihan: auto (ikuti sistem), light, dark.
+  (function () {
+    var t = localStorage.getItem('nvr-theme') || 'auto';
+    var dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
 <style>
+  :root{
+    --bg:#f3f5fb;--surface:#ffffff;--surface2:#f7f8fc;--border:#e2e6f0;--text:#1c2233;--muted:#6b7385;
+    --primary:#4f46e5;--primary2:#7c3aed;--primary-soft:#eef0ff;
+    --ok:#16a34a;--ok-soft:#dcfce7;--warn:#d97706;--warn-soft:#fef3c7;--bad:#dc2626;--bad-soft:#fee2e2;
+    --info:#0284c7;--info-soft:#e0f2fe;--shadow:0 1px 2px #0000000d,0 4px 14px #1c22330f;
+    --side:#ffffff;--side-text:#3b4256;--side-hover:#f1f2f8;
+  }
+  [data-theme=dark]{
+    --bg:#0f1220;--surface:#171b2e;--surface2:#1d2238;--border:#2a3050;--text:#e7e9f3;--muted:#949bb3;
+    --primary:#818cf8;--primary2:#a78bfa;--primary-soft:#262b4d;
+    --ok:#4ade80;--ok-soft:#14321f;--warn:#fbbf24;--warn-soft:#3a2d0c;--bad:#f87171;--bad-soft:#3b1717;
+    --info:#38bdf8;--info-soft:#0c2b3d;--shadow:0 1px 2px #0006,0 6px 20px #0005;
+    --side:#141829;--side-text:#c4c8da;--side-hover:#1f2440;
+  }
   *{box-sizing:border-box}
-  body{font-family:system-ui,sans-serif;margin:0;background:#111;color:#eee}
-  #sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:#1b1b1b;display:flex;flex-direction:column;padding:16px 10px;gap:4px;z-index:10;transition:transform .2s}
-  #sidebar strong{font-size:18px;padding:0 10px 12px}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:var(--bg);color:var(--text);transition:background .2s,color .2s}
+  #sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--side);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:4px;z-index:10;transition:transform .2s}
+  #sidebar strong{font-size:20px;padding:0 10px 14px;background:linear-gradient(90deg,var(--primary),var(--primary2));-webkit-background-clip:text;background-clip:text;color:transparent}
   nav{display:flex;flex-direction:column;gap:2px;flex:1}
-  nav button{background:none;border:0;color:#bbb;padding:10px 12px;border-radius:6px;text-align:left;margin:0}
-  nav button:hover{background:#262626}
-  nav button.active{background:#333;color:#fff}
-  #who{color:#999;font-size:13px;padding:8px 10px}
-  #logout{margin:0 10px}
+  nav button{background:none;border:0;color:var(--side-text);padding:10px 12px;border-radius:10px;text-align:left;margin:0;font-weight:500}
+  nav button:hover{background:var(--side-hover)}
+  nav button.active{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;box-shadow:var(--shadow)}
+  #who{color:var(--muted);font-size:13px;padding:8px 10px}
+  #logout,#themeBtn{margin:2px 10px}
   #topbar{display:none}
   #backdrop{display:none}
-  main{padding:16px;max-width:1200px;margin:0 auto}
+  main{padding:20px;max-width:1200px;margin:0 auto}
   body.authed main{margin-left:220px;max-width:none}
-  input,select,button{font-size:15px;padding:8px;margin:4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
-  button{cursor:pointer}
-  button.danger{border-color:#733;color:#f99}
-  table{width:100%;border-collapse:collapse;margin:8px 0}
-  td,th{padding:6px;border-bottom:1px solid #333;text-align:left;word-break:break-word}
+  h2.title{margin:0 0 14px;font-size:22px}
+  h4{margin:18px 0 8px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow);margin-bottom:14px}
+  input,select,button{font:inherit;font-size:15px;padding:9px 12px;margin:0;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);transition:border-color .15s,box-shadow .15s,transform .05s}
+  input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  button{cursor:pointer;font-weight:500}
+  button:active{transform:scale(.97)}
+  button.primary,form button:not([type=button]),#recSearch{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;border:0}
+  button.danger{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+  button.ghost{background:var(--primary-soft);border-color:transparent;color:var(--primary)}
+  a.link{color:var(--primary);text-decoration:none;font-weight:500;padding:9px 6px}
   .hide{display:none!important}
-  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
-  .row label{display:flex;flex-direction:column;font-size:13px;color:#aaa}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
-  .tile{background:#000;border-radius:8px;overflow:hidden;position:relative}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+  .row label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:3px;gap:3px}
+  .seg button{border:0;background:none;padding:8px 14px;border-radius:9px;color:var(--muted)}
+  .seg button.on{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chips button{padding:6px 12px;font-size:13px;border-radius:999px;background:var(--primary-soft);border:0;color:var(--primary)}
+  table{width:100%;border-collapse:separate;border-spacing:0}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600}
+  td,th{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;word-break:break-word;vertical-align:middle}
+  tbody tr{transition:background .15s}
+  tbody tr:hover{background:var(--surface2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.actions{white-space:nowrap;text-align:right}
+  td.actions>*{margin-left:4px}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .b-ok{background:var(--ok-soft);color:var(--ok)}.b-warn{background:var(--warn-soft);color:var(--warn)}
+  .b-bad{background:var(--bad-soft);color:var(--bad)}.b-info{background:var(--info-soft);color:var(--info)}
+  .b-pri{background:var(--primary-soft);color:var(--primary)}
+  .b-ok.pulse::before{animation:pulse 1.4s infinite}
+  @keyframes pulse{50%{opacity:.25}}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+  .tile{background:#000;border-radius:14px;overflow:hidden;position:relative;box-shadow:var(--shadow)}
   .tile video{width:100%;aspect-ratio:16/9;display:block;background:#000}
-  .tile .cap{position:absolute;left:0;top:0;padding:4px 8px;background:#0008;font-size:13px}
-  .tile .st{position:absolute;right:0;top:0;padding:4px 8px;background:#0008;font-size:12px;color:#aaa}
-  #player{width:100%;max-height:60vh;background:#000}
-  .msg{color:#9c9;min-height:1.2em}.err{color:#f88}
-  .muted{color:#888;font-size:13px}
+  .tile .cap{position:absolute;left:10px;top:10px;padding:4px 10px;border-radius:999px;background:#000a;color:#fff;font-size:13px;font-weight:600}
+  .tile .st{position:absolute;right:10px;top:10px}
+  #player{width:100%;max-height:60vh;background:#000;border-radius:12px;display:block}
+  .msg{color:var(--ok);min-height:1.2em;margin:10px 0 0}.err{color:var(--bad);min-height:1.2em;margin:10px 0 0}
+  .muted{color:var(--muted);font-size:13px}
+  .empty{text-align:center;color:var(--muted);padding:28px 10px}
+  .login-wrap{min-height:80vh;display:flex;align-items:center;justify-content:center}
+  #login{width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px}
+  #login h3{margin:0 0 4px;font-size:22px;background:linear-gradient(90deg,var(--primary),var(--primary2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #pwForm{display:flex;flex-direction:column;gap:6px}
+  #pwForm label{font-size:12px;font-weight:600;color:var(--muted);margin-top:6px}
   @media (max-width:800px){
     #sidebar{transform:translateX(-100%)}
     body.menu-open #sidebar{transform:none}
     body.menu-open #backdrop{display:block;position:fixed;inset:0;background:#0008;z-index:9}
-    body.authed #topbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1b1b1b;position:sticky;top:0;z-index:5}
-    #topbar button{margin:0;font-size:20px;padding:4px 12px}
+    body.authed #topbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--side);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+    #topbar #pageTitle{flex:1}
+    #topbar button{margin:0;font-size:18px;padding:6px 12px}
     body.authed main{margin-left:0}
+    h2.title{display:none}
   }
   @media (max-width:640px){
-    main{padding:10px}
+    main{padding:12px}
     .grid{grid-template-columns:1fr}
     input,select,button{font-size:16px;min-height:44px}
-    .row label,.row input,.row select,.row button{width:100%}
+    .row label,.row input,.row select,.row>button{width:100%}
+    .seg{display:flex;width:100%}.seg button{flex:1}
+    .card.list{padding:0;background:none;border:0;box-shadow:none}
     table,tbody,tr{display:block;width:100%}
     thead{display:none}
-    tr{border:1px solid #333;border-radius:8px;margin:8px 0;padding:6px 8px;background:#181818}
-    td{display:inline-block;border:0;padding:4px 4px 4px 0}
-    td:first-child{display:block;font-weight:600}
+    tbody tr{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 0 10px;padding:12px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+    tbody tr:hover{background:var(--surface)}
+    td{border:0;padding:0;font-size:14px}
+    td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);letter-spacing:.03em}
+    td:first-child{grid-column:1/-1;font-weight:700;font-size:15px}
+    td.actions{grid-column:1/-1;display:flex;gap:8px;text-align:left;margin-top:4px}
+    td.actions>*{margin:0;flex:1;text-align:center}
+    td.wide{grid-column:1/-1}
   }
 </style>
 </head>
 <body>
-<div id="topbar"><button id="menuBtn" aria-label="Menu">&#9776;</button><strong id="pageTitle">NVR</strong></div>
+<div id="topbar"><button id="menuBtn" aria-label="Menu">&#9776;</button><strong id="pageTitle">NVR</strong><button id="themeBtn2" aria-label="Tema" type="button"></button></div>
 <div id="backdrop"></div>
 <aside id="sidebar" class="hide">
   <strong>NVR</strong>
@@ -69,59 +132,79 @@
     <button data-page="password">Ganti Password</button>
   </nav>
   <span id="who"></span>
-  <button id="logout">Keluar</button>
+  <button id="themeBtn" class="ghost" type="button"></button>
+  <button id="logout" type="button">Keluar</button>
 </aside>
 <main>
-  <form id="login" class="hide" style="max-width:360px">
-    <h3>Masuk</h3>
-    <input name="username" placeholder="Username" autocomplete="username" style="width:100%"><br>
-    <input name="password" type="password" placeholder="Password" autocomplete="current-password" style="width:100%"><br>
-    <button style="width:100%">Masuk</button>
+  <div class="login-wrap" id="loginWrap">
+  <form id="login" class="card hide">
+    <h3>NVR</h3>
+    <span class="muted">Masuk untuk melanjutkan</span>
+    <input name="username" placeholder="Username" autocomplete="username">
+    <input name="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button>Masuk</button>
     <p id="loginErr" class="err"></p>
   </form>
+  </div>
 
   <!-- Dashboard: live semua kamera -->
   <section id="page-dashboard" class="page hide">
+    <h2 class="title">Live</h2>
     <div class="grid" id="liveGrid"></div>
-    <p id="liveEmpty" class="muted hide">Belum ada kamera.</p>
+    <div id="liveEmpty" class="card empty hide">Belum ada kamera. Tambahkan di menu Kamera.</div>
   </section>
 
   <!-- Rekaman -->
   <section id="page-recordings" class="page hide">
-    <div class="row">
-      <label>Sumber
-        <select id="recLoc">
-          <option value="local">Flashdisk (lokal)</option>
-          <option value="drive">Google Drive</option>
-        </select>
-      </label>
-      <label>Kamera <select id="recCam"></select></label>
-      <label>Dari <input type="datetime-local" id="recFrom"></label>
-      <label>Sampai <input type="datetime-local" id="recTo"></label>
-      <button id="recSearch">Cari</button>
+    <h2 class="title">Rekaman</h2>
+    <div class="card">
+      <div class="seg" id="recLocSeg">
+        <button type="button" data-v="local" class="on">Flashdisk</button>
+        <button type="button" data-v="drive">Google Drive</button>
+      </div>
+      <input type="hidden" id="recLoc" value="local">
+      <div class="row" style="margin-top:12px">
+        <label>Kamera <select id="recCam"></select></label>
+        <label>Dari <input type="datetime-local" id="recFrom"></label>
+        <label>Sampai <input type="datetime-local" id="recTo"></label>
+        <button id="recSearch" type="button">Cari</button>
+      </div>
+      <div class="chips" id="recQuick">
+        <button type="button" data-h="1">1 jam</button>
+        <button type="button" data-h="2">2 jam</button>
+        <button type="button" data-h="6">6 jam</button>
+        <button type="button" data-h="24">24 jam</button>
+        <button type="button" data-h="168">7 hari</button>
+      </div>
+    </div>
+    <div class="card hide" id="playerCard">
+      <video id="player" controls playsinline></video>
+      <p id="playMsg" class="muted" style="margin:8px 0 0"></p>
     </div>
     <p class="muted" id="recInfo"></p>
-    <video id="player" controls playsinline class="hide"></video>
-    <p id="playMsg" class="muted"></p>
-    <table><thead><tr><th>Waktu</th><th>Kamera</th><th>Ukuran</th><th>Lokasi</th><th></th></tr></thead><tbody id="recs"></tbody></table>
+    <div class="card list"><table><thead><tr><th>Waktu</th><th>Kamera</th><th>Ukuran</th><th>Lokasi</th><th></th></tr></thead><tbody id="recs"></tbody></table></div>
   </section>
 
   <!-- Kamera (admin) -->
   <section id="page-cameras" class="page hide">
-    <table><thead><tr><th>Nama</th><th>URL</th><th>Status</th><th></th></tr></thead><tbody id="cams"></tbody></table>
-    <h4>Tambah kamera</h4>
-    <form id="addCam" class="row">
-      <label>Nama <input name="name" required></label>
-      <label style="flex:1">URL RTSP <input name="rtsp_url" placeholder="rtsp://user:pass@ip:554/Streaming/Channels/101" required></label>
-      <button>Tambah</button>
-    </form>
-    <p id="camMsg" class="msg"></p>
+    <h2 class="title">Kamera</h2>
+    <div class="card">
+      <h4 style="margin-top:0">Tambah kamera</h4>
+      <form id="addCam" class="row">
+        <label>Nama <input name="name" required placeholder="Contoh: Teras"></label>
+        <label style="flex:1">URL RTSP <input name="rtsp_url" placeholder="rtsp://user:pass@ip:554/Streaming/Channels/101" required></label>
+        <button>Tambah</button>
+      </form>
+      <p id="camMsg" class="msg"></p>
+    </div>
+    <div class="card list"><table><thead><tr><th>Nama</th><th>URL</th><th>Status</th><th></th></tr></thead><tbody id="cams"></tbody></table></div>
   </section>
 
   <!-- Pengguna (admin) -->
   <section id="page-users" class="page hide">
-    <table><thead><tr><th>Username</th><th>Role</th><th></th></tr></thead><tbody id="userList"></tbody></table>
-    <h4>Tambah pengguna</h4>
+    <h2 class="title">Pengguna</h2>
+    <div class="card">
+    <h4 style="margin-top:0">Tambah pengguna</h4>
     <form id="addUser" class="row">
       <label>Username <input name="username" required autocomplete="off"></label>
       <label>Password <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
@@ -131,24 +214,50 @@
       <button>Tambah</button>
     </form>
     <p id="userMsg" class="msg"></p>
+    </div>
+    <div class="card list"><table><thead><tr><th>Username</th><th>Role</th><th></th></tr></thead><tbody id="userList"></tbody></table></div>
   </section>
 
   <!-- Ganti password -->
-  <section id="page-password" class="page hide" style="max-width:360px">
+  <section id="page-password" class="page hide" style="max-width:420px">
+    <h2 class="title">Ganti Password</h2>
+    <div class="card">
     <form id="pwForm">
-      <label class="muted">Password lama</label><input name="current" type="password" required autocomplete="current-password" style="width:100%">
-      <label class="muted">Password baru (min. 8 karakter)</label><input name="password" type="password" minlength="8" required autocomplete="new-password" style="width:100%">
-      <label class="muted">Ulangi password baru</label><input name="confirm" type="password" minlength="8" required autocomplete="new-password" style="width:100%">
-      <button style="width:100%">Simpan</button>
+      <label>Password lama</label><input name="current" type="password" required autocomplete="current-password">
+      <label>Password baru (min. 8 karakter)</label><input name="password" type="password" minlength="8" required autocomplete="new-password">
+      <label>Ulangi password baru</label><input name="confirm" type="password" minlength="8" required autocomplete="new-password">
+      <button style="margin-top:10px">Simpan</button>
     </form>
     <p id="pwMsg" class="msg"></p>
+    </div>
   </section>
 </main>
 <script src="/vendor/hls/hls.min.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
-const btn = (label, fn, cls = '') => el('button', { textContent: label, onclick: fn, className: cls });
+const btn = (label, fn, cls = '') => el('button', { textContent: label, onclick: fn, className: cls, type: 'button' });
+const badge = (text, kind, extra = '') => el('span', { className: `badge b-${kind} ${extra}`, textContent: text });
+const td = (label, ...kids) => { const e = el('td', {}, ...kids); if (label) e.dataset.label = label; return e; };
+const emptyRow = (tbody, cols, text) => tbody.append(el('tr', {}, el('td', { colSpan: cols, className: 'empty', textContent: text })));
+
+// Tema: auto -> light -> dark
+const THEMES = { auto: 'Tema: Otomatis', light: 'Tema: Terang', dark: 'Tema: Gelap' };
+const THEME_ICON = { auto: '\u{1F313}', light: '\u2600\uFE0F', dark: '\u{1F319}' };
+function applyTheme() {
+  const t = localStorage.getItem('nvr-theme') || 'auto';
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('#themeBtn').textContent = THEME_ICON[t] + ' ' + THEMES[t];
+  $('#themeBtn2').textContent = THEME_ICON[t];
+}
+function cycleTheme() {
+  const order = ['auto', 'light', 'dark'];
+  const t = localStorage.getItem('nvr-theme') || 'auto';
+  localStorage.setItem('nvr-theme', order[(order.indexOf(t) + 1) % 3]);
+  applyTheme();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 let me = null, cams = [];
 
 async function api(p, o = {}) {
@@ -160,6 +269,8 @@ async function api(p, o = {}) {
   return j;
 }
 function say(sel, text, err = false) { const e = $(sel); e.textContent = text; e.className = err ? 'err' : 'msg'; }
+const MENU_ICON = { dashboard: '\u{1F4FA}', recordings: '\u{1F39E}\uFE0F', cameras: '\u{1F4F7}', users: '\u{1F465}', password: '\u{1F511}' };
+document.querySelectorAll('nav button').forEach((b) => { b.dataset.name = b.textContent; b.textContent = MENU_ICON[b.dataset.page] + '  ' + b.textContent; });
 const fmtTime = (t) => new Date(t * 1000).toLocaleString('id-ID');
 const camName = (id) => (cams.find((c) => c.id === id) || {}).name || ('#' + id);
 
@@ -168,14 +279,14 @@ function showLogin() {
   me = null; stopAllLive();
   document.querySelectorAll('.page').forEach((p) => p.classList.add('hide'));
   $('#sidebar').classList.add('hide'); document.body.classList.remove('authed', 'menu-open');
-  $('#who').textContent = ''; $('#login').classList.remove('hide');
+  $('#who').textContent = ''; $('#loginWrap').classList.remove('hide'); $('#login').classList.remove('hide');
 }
 function go(page) {
   if (!me) return;
   if (document.querySelector(`nav [data-page="${page}"][data-admin]`) && me.role !== 'admin') page = 'dashboard';
   if (location.hash.slice(1) !== page) history.replaceState(null, '', '#' + page);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.page === page));
-  $('#pageTitle').textContent = document.querySelector(`nav [data-page="${page}"]`)?.textContent || 'NVR';
+  $('#pageTitle').textContent = document.querySelector(`nav [data-page="${page}"]`)?.dataset.name || 'NVR';
   document.body.classList.remove('menu-open');
   document.querySelectorAll('.page').forEach((p) => p.classList.toggle('hide', p.id !== 'page-' + page));
   if (page !== 'dashboard') stopAllLive();
@@ -183,12 +294,13 @@ function go(page) {
   ({ dashboard: loadDashboard, recordings: initRecordings, cameras: loadCams, users: loadUsers, password: () => {} })[page]?.();
 }
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => go(b.dataset.page)));
+$('#themeBtn').onclick = cycleTheme; $('#themeBtn2').onclick = cycleTheme; applyTheme();
 $('#menuBtn').onclick = () => document.body.classList.toggle('menu-open');
 $('#backdrop').onclick = () => document.body.classList.remove('menu-open');
 
 async function start() {
   try { me = await api('/auth/me'); } catch { return showLogin(); }
-  $('#login').classList.add('hide');
+  $('#login').classList.add('hide'); $('#loginWrap').classList.add('hide');
   $('#sidebar').classList.remove('hide'); document.body.classList.add('authed');
   document.querySelectorAll('nav [data-admin]').forEach((b) => b.classList.toggle('hide', me.role !== 'admin'));
   $('#who').textContent = `${me.user} (${me.role === 'admin' ? 'full akses' : 'read only'})`;
@@ -208,16 +320,17 @@ function stopAllLive() { while (players.length) { const p = players.pop(); p.hls
 function attachLive(video, st, id) {
   const url = `/live/cam${id}/index.m3u8`;
   const p = { video, hls: null }; players.push(p);
-  st.textContent = 'memuat...';
+  const setSt = (t, k) => { st.textContent = t; st.className = `st badge b-${k}` + (k === 'ok' ? ' pulse' : ''); };
+  setSt('memuat', 'warn');
   if (window.Hls && Hls.isSupported()) {
     const h = new Hls({ liveSyncDurationCount: 2, manifestLoadingMaxRetry: 10, manifestLoadingRetryDelay: 2000, levelLoadingMaxRetry: 10 });
     p.hls = h;
-    h.on(Hls.Events.MANIFEST_PARSED, () => { st.textContent = 'live'; video.play().catch(() => {}); });
-    h.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { st.textContent = 'offline, mencoba lagi...'; setTimeout(() => { if (players.includes(p)) { h.loadSource(url); h.startLoad(); } }, 5000); } });
+    h.on(Hls.Events.MANIFEST_PARSED, () => { setSt('LIVE', 'ok'); video.play().catch(() => {}); });
+    h.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { setSt('offline', 'bad'); setTimeout(() => { if (players.includes(p)) { h.loadSource(url); h.startLoad(); } }, 5000); } });
     h.loadSource(url); h.attachMedia(video);
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = url; video.play().catch(() => {}); st.textContent = 'live';
-  } else st.textContent = 'browser tidak mendukung HLS';
+    video.src = url; video.play().catch(() => {}); setSt('LIVE', 'ok');
+  } else setSt('tidak didukung', 'bad');
 }
 async function loadDashboard() {
   stopAllLive();
@@ -226,7 +339,7 @@ async function loadDashboard() {
   $('#liveEmpty').classList.toggle('hide', cams.length > 0);
   for (const c of cams) {
     const video = el('video', { muted: true, playsInline: true, autoplay: true, controls: true });
-    const st = el('span', { className: 'st' });
+    const st = el('span', { className: 'st badge b-warn' });
     g.append(el('div', { className: 'tile' }, video, el('span', { className: 'cap', textContent: c.name }), st));
     attachLive(video, st, c.id);
   }
@@ -245,13 +358,20 @@ async function initRecordings() {
     const now = new Date();
     $('#recTo').value = toLocalInput(new Date(now.getTime() + 60000));
     $('#recFrom').value = toLocalInput(new Date(now.getTime() - 2 * 3600 * 1000));
-    $('#recLoc').onchange = () => {
-      // Default rentang: flashdisk 2 jam terakhir, Drive 24 jam terakhir.
-      const n = new Date(), h = $('#recLoc').value === 'drive' ? 24 : 2;
+    const setRange = (h) => {
+      const n = new Date();
       $('#recFrom').value = toLocalInput(new Date(n.getTime() - h * 3600 * 1000));
       $('#recTo').value = toLocalInput(new Date(n.getTime() + 60000));
-      searchRecs();
     };
+    document.querySelectorAll('#recLocSeg button').forEach((b) => (b.onclick = () => {
+      document.querySelectorAll('#recLocSeg button').forEach((x) => x.classList.toggle('on', x === b));
+      $('#recLoc').value = b.dataset.v;
+      // Default rentang: flashdisk 2 jam terakhir, Drive 24 jam terakhir.
+      setRange(b.dataset.v === 'drive' ? 24 : 2);
+      searchRecs();
+    }));
+    document.querySelectorAll('#recQuick button').forEach((b) => (b.onclick = () => { setRange(Number(b.dataset.h)); searchRecs(); }));
+    $('#recCam').onchange = searchRecs;
   }
   searchRecs();
 }
@@ -259,36 +379,43 @@ async function searchRecs() {
   const from = Math.floor(new Date($('#recFrom').value).getTime() / 1000) || 0;
   const to = Math.floor(new Date($('#recTo').value).getTime() / 1000) || 0;
   if (from && to && from > to) return ($('#recInfo').textContent = 'Waktu "Dari" harus sebelum "Sampai".');
+  $('#recInfo').textContent = 'Memuat...';
   const q = new URLSearchParams({ location: $('#recLoc').value, camera_id: $('#recCam').value, from, to });
   const recs = await api('/api/recordings?' + q);
-  $('#recInfo').textContent = `${recs.length} segmen` + (recs.length >= 1000 ? ' (dibatasi 1000, persempit rentang waktu)' : '');
+  const total = recs.reduce((a, r) => a + r.size, 0);
+  $('#recInfo').textContent = `${recs.length} segmen, ${(total / 1073741824).toFixed(2)} GB` + (recs.length >= 1000 ? ' (dibatasi 1000, persempit rentang waktu)' : '');
   const t = $('#recs'); t.replaceChildren();
+  if (!recs.length) emptyRow(t, 5, 'Tidak ada rekaman pada rentang waktu ini.');
   for (const r of recs) {
     const where = r.local ? (r.uploaded ? 'flashdisk + drive' : 'flashdisk') : 'drive';
+    const kind = r.local ? (r.uploaded ? 'ok' : 'warn') : 'info';
+    const tdAct = el('td', { className: 'actions' }, btn('\u25B6 Putar', () => play(r, where), 'primary'), el('a', { className: 'link', href: `/api/recordings/${r.id}/file`, download: `cam${r.camera_id}_${r.start}.mp4`, textContent: 'Unduh' }));
     t.append(el('tr', {},
-      el('td', { textContent: fmtTime(r.start) }), el('td', { textContent: camName(r.camera_id) }),
-      el('td', { textContent: (r.size / 1048576).toFixed(1) + ' MB' }), el('td', { textContent: where }),
-      el('td', {}, btn('Putar', () => play(r, where)), ' ', el('a', { href: `/api/recordings/${r.id}/file`, download: `cam${r.camera_id}_${r.start}.mp4`, textContent: 'Unduh', style: 'color:#9cf' }))));
+      td('', fmtTime(r.start)), td('Kamera', camName(r.camera_id)),
+      td('Ukuran', (r.size / 1048576).toFixed(1) + ' MB'), td('Lokasi', badge(r.local && !r.uploaded ? 'flashdisk (antre upload)' : where, kind)),
+      tdAct));
   }
 }
 $('#recSearch').onclick = searchRecs;
 function play(r, where) {
-  const v = $('#player'); v.classList.remove('hide');
+  const v = $('#player'); $('#playerCard').classList.remove('hide');
   $('#playMsg').textContent = `${camName(r.camera_id)} – ${fmtTime(r.start)}` + (r.local ? '' : ' (mengunduh dari Google Drive, tunggu sebentar...)');
   v.src = `/api/recordings/${r.id}/file`; v.play().catch(() => {});
   v.onerror = () => ($('#playMsg').textContent = 'Gagal memutar rekaman.');
-  v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $('#playerCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ---------- kamera (admin) ----------
 async function loadCams() {
   cams = await api('/api/cameras');
   const t = $('#cams'); t.replaceChildren();
+  if (!cams.length) emptyRow(t, 4, 'Belum ada kamera.');
   for (const c of cams) {
+    const url = td('URL', c.rtsp_url); url.classList.add('wide'); url.style.fontSize = '13px'; url.style.color = 'var(--muted)';
     t.append(el('tr', {},
-      el('td', { textContent: c.name }), el('td', { textContent: c.rtsp_url }), el('td', { textContent: c.running ? 'merekam' : 'berhenti' }),
-      el('td', {},
-        btn(c.running ? 'Stop' : 'Start', async () => { await api(`/api/cameras/${c.id}/${c.running ? 'stop' : 'start'}`, { method: 'POST' }); loadCams(); }), ' ',
+      td('', c.name), url, td('Status', c.running ? badge('merekam', 'ok', 'pulse') : badge('berhenti', 'bad')),
+      el('td', { className: 'actions' },
+        btn(c.running ? '\u23F8 Stop' : '\u25B6 Start', async () => { await api(`/api/cameras/${c.id}/${c.running ? 'stop' : 'start'}`, { method: 'POST' }); loadCams(); }, 'ghost'),
         btn('Hapus', async () => { if (confirm(`Hapus kamera "${c.name}"? Rekaman lama tetap tersimpan sampai masa retensi habis.`)) { await api(`/api/cameras/${c.id}`, { method: 'DELETE' }); loadCams(); } }, 'danger'))));
   }
 }
@@ -307,14 +434,14 @@ async function loadUsers() {
     const self = u.username === me.user;
     const role = el('select', {}, el('option', { value: 'viewer', textContent: 'Read only' }), el('option', { value: 'admin', textContent: 'Full akses' }));
     role.value = u.role; role.disabled = self;
-    role.onchange = async () => { try { await api('/users/' + encodeURIComponent(u.username), { method: 'PUT', body: JSON.stringify({ role: role.value }) }); say('#userMsg', 'Role diubah.'); } catch (x) { say('#userMsg', x.message, true); loadUsers(); } };
+    role.onchange = async () => { try { await api('/users/' + encodeURIComponent(u.username), { method: 'PUT', body: JSON.stringify({ role: role.value }) }); say('#userMsg', 'Role diubah.'); loadUsers(); } catch (x) { say('#userMsg', x.message, true); loadUsers(); } };
     t.append(el('tr', {},
-      el('td', { textContent: u.username + (self ? ' (Anda)' : '') }), el('td', {}, role),
-      el('td', {},
+      td('', u.username + (self ? ' (Anda)' : ''), ' ', badge(u.role === 'admin' ? 'full akses' : 'read only', u.role === 'admin' ? 'pri' : 'info')), td('Role', role),
+      el('td', { className: 'actions' },
         btn('Reset password', async () => {
           const pw = prompt(`Password baru untuk ${u.username} (min. 8 karakter):`); if (!pw) return;
           try { await api('/users/' + encodeURIComponent(u.username), { method: 'PUT', body: JSON.stringify({ password: pw }) }); say('#userMsg', 'Password direset. Sesi pengguna itu otomatis keluar.'); } catch (x) { say('#userMsg', x.message, true); }
-        }), ' ',
+        }, 'ghost'),
         self ? '' : btn('Hapus', async () => {
           if (!confirm(`Hapus pengguna "${u.username}"?`)) return;
           try { await api('/users/' + encodeURIComponent(u.username), { method: 'DELETE' }); loadUsers(); } catch (x) { say('#userMsg', x.message, true); }

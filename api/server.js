@@ -181,6 +181,9 @@ app.use(
 );
 
 app.use('/vendor/hls', express.static(path.join(here, 'node_modules/hls.js/dist')));
-app.use(express.static(path.join(here, 'public')));
+// HTML selalu divalidasi ulang agar browser (terutama HP) tidak menampilkan versi UI lama dari cache.
+app.use(express.static(path.join(here, 'public'), {
+  setHeaders: (res, file) => { if (file.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); },
+}));
 
 app.listen(Number(PORT), () => console.log(`api listening on :${PORT}, recorder=${RECORDER_URL}`));
