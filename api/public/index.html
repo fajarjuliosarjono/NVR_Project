@@ -14,6 +14,20 @@
   td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
   video{width:100%;max-height:60vh;background:#000}
   .hide{display:none}
+  input{font-size:16px;max-width:100%}
+  td{word-break:break-word}
+  @media (max-width:640px){
+    main{padding:12px}
+    input,button{font-size:16px;min-height:44px;box-sizing:border-box}
+    #login input,#addCam input{width:100%}
+    #addCam button,#login button{width:100%}
+    table,tbody,tr{display:block;width:100%}
+    tr{border:1px solid #333;border-radius:8px;margin:8px 0;padding:6px 8px;background:#181818}
+    td{display:inline-block;border:0;padding:4px 4px 4px 0}
+    td:first-child{display:block;font-weight:600}
+    td button{padding:6px 12px;min-height:40px}
+    video{max-height:40vh}
+  }
 </style>
 </head>
 <body>
