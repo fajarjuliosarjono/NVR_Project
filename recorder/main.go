@@ -356,7 +356,7 @@ func (a *App) routes() http.Handler {
 			loc = " AND uploaded=1"
 		}
 		rows, err := a.db.Query(`SELECT id,camera_id,start,size,uploaded,local FROM recordings
-WHERE (?=0 OR camera_id=?) AND start>=? AND start<=?`+loc+` ORDER BY start DESC LIMIT 1000`, cam, cam, from, to)
+WHERE (?=0 OR camera_id=?) AND start>=? AND start<=?`+loc+` ORDER BY start DESC LIMIT 5000`, cam, cam, from, to)
 		if err != nil {
 			httpErr(w, 500, err.Error())
 			return

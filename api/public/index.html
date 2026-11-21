@@ -89,6 +89,23 @@
   #login h3{margin:0 0 4px;font-size:22px;background:linear-gradient(90deg,var(--primary),var(--primary2));-webkit-background-clip:text;background-clip:text;color:transparent}
   #pwForm{display:flex;flex-direction:column;gap:6px}
   #pwForm label{font-size:12px;font-weight:600;color:var(--muted);margin-top:6px}
+  .dt-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .dt-search{position:relative;flex:1;min-width:220px;max-width:420px}
+  .dt-search input{width:100%;padding-left:36px}
+  .dt-search::before{content:"\1F50D";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.6}
+  .dt-bar .muted select{margin:0 4px;padding:6px 8px}
+  th.sort{cursor:pointer;user-select:none;white-space:nowrap}
+  th.sort:hover{color:var(--primary)}
+  th.sort::after{content:" \2195";opacity:.35}
+  th.sort.asc::after{content:" \2191";opacity:1;color:var(--primary)}
+  th.sort.desc::after{content:" \2193";opacity:1;color:var(--primary)}
+  .dt-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+  .pager{display:flex;flex-wrap:wrap;gap:4px}
+  .pager button{min-width:38px;padding:6px 10px;font-size:13px}
+  .pager button.on{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;border:0}
+  .pager button:disabled{opacity:.4;cursor:default}
+  mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 1px}
+  .dt-sort-m{display:none}
   @media (max-width:800px){
     #sidebar{transform:translateX(-100%)}
     body.menu-open #sidebar{transform:none}
@@ -101,6 +118,9 @@
   }
   @media (max-width:640px){
     main{padding:12px}
+    .dt-search{max-width:none}
+    .dt-sort-m{display:inline-flex;gap:6px;align-items:center}
+    .dt-foot{justify-content:center}
     .grid{grid-template-columns:1fr}
     input,select,button{font-size:16px;min-height:44px}
     .row label,.row input,.row select,.row>button{width:100%}
@@ -181,8 +201,24 @@
       <video id="player" controls playsinline></video>
       <p id="playMsg" class="muted" style="margin:8px 0 0"></p>
     </div>
-    <p class="muted" id="recInfo"></p>
-    <div class="card list"><table><thead><tr><th>Waktu</th><th>Kamera</th><th>Ukuran</th><th>Lokasi</th><th></th></tr></thead><tbody id="recs"></tbody></table></div>
+    <div class="card list">
+      <div class="dt-bar">
+        <div class="dt-search"><input type="search" id="dtQ" placeholder="Cari tanggal, jam, kamera, lokasi... (mis. 21/11 17:)"></div>
+        <span class="muted dt-sort-m">Urut
+          <select id="dtSortM">
+            <option value="start:desc">Terbaru</option><option value="start:asc">Terlama</option>
+            <option value="cam:asc">Kamera A-Z</option><option value="size:desc">Terbesar</option><option value="size:asc">Terkecil</option>
+          </select></span>
+        <span class="muted">Tampil
+          <select id="dtSize"><option>10</option><option selected>25</option><option>50</option><option>100</option></select> baris</span>
+      </div>
+      <p class="muted" id="recInfo" style="margin:0 0 8px"></p>
+      <table><thead><tr>
+        <th class="sort desc" data-k="start">Waktu</th><th class="sort" data-k="cam">Kamera</th>
+        <th class="sort" data-k="size">Ukuran</th><th class="sort" data-k="where">Lokasi</th><th></th>
+      </tr></thead><tbody id="recs"></tbody></table>
+      <div class="dt-foot"><span class="muted" id="dtInfo"></span><div class="pager" id="dtPager"></div></div>
+    </div>
   </section>
 
   <!-- Kamera (admin) -->
@@ -375,6 +411,88 @@ async function initRecordings() {
   }
   searchRecs();
 }
+// Datatable rekaman: data diambil sekali per pencarian server (lokasi, kamera, rentang waktu),
+// lalu pencarian teks, pengurutan, dan halaman dilakukan di browser.
+const dt = { rows: [], q: '', key: 'start', dir: 'desc', size: 25, page: 1 };
+const fmtSize = (b) => (b / 1048576).toFixed(1) + ' MB';
+function recRow(r) {
+  const where = r.local ? (r.uploaded ? 'flashdisk + drive' : 'flashdisk (antre upload)') : 'drive';
+  const kind = r.local ? (r.uploaded ? 'ok' : 'warn') : 'info';
+  const time = fmtTime(r.start), cam = camName(r.camera_id);
+  return { r, time, cam, where, kind, size: r.size, start: r.start, text: `${time} ${cam} ${where} ${fmtSize(r.size)}`.toLowerCase() };
+}
+function hl(text) {
+  // Sorot kata yang dicari tanpa memakai innerHTML.
+  const frag = document.createDocumentFragment();
+  const q = dt.q.trim().toLowerCase();
+  if (!q) { frag.append(text); return frag; }
+  const words = q.split(/\s+/).filter(Boolean);
+  const lower = text.toLowerCase();
+  const marks = [];
+  for (const w of words) { let i = lower.indexOf(w); while (i >= 0) { marks.push([i, i + w.length]); i = lower.indexOf(w, i + w.length); } }
+  marks.sort((a, b) => a[0] - b[0]);
+  let pos = 0;
+  for (const [a, b] of marks) {
+    if (a < pos) continue;
+    frag.append(text.slice(pos, a), el('mark', { textContent: text.slice(a, b) }));
+    pos = b;
+  }
+  frag.append(text.slice(pos));
+  return frag;
+}
+function renderDt() {
+  const words = dt.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let rows = words.length ? dt.rows.filter((x) => words.every((w) => x.text.includes(w))) : dt.rows.slice();
+  const k = dt.key, m = dt.dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => (a[k] < b[k] ? -m : a[k] > b[k] ? m : (b.start - a.start)));
+  const pages = Math.max(1, Math.ceil(rows.length / dt.size));
+  dt.page = Math.min(Math.max(1, dt.page), pages);
+  const startIdx = (dt.page - 1) * dt.size, view = rows.slice(startIdx, startIdx + dt.size);
+
+  const t = $('#recs'); t.replaceChildren();
+  if (!dt.rows.length) emptyRow(t, 5, 'Tidak ada rekaman pada rentang waktu ini.');
+  else if (!rows.length) emptyRow(t, 5, `Tidak ada hasil untuk "${dt.q}".`);
+  for (const x of view) {
+    const tdAct = el('td', { className: 'actions' }, btn('\u25B6 Putar', () => play(x.r, x.where), 'primary'),
+      el('a', { className: 'link', href: `/api/recordings/${x.r.id}/file`, download: `cam${x.r.camera_id}_${x.r.start}.mp4`, textContent: 'Unduh' }));
+    t.append(el('tr', {}, td('', hl(x.time)), td('Kamera', hl(x.cam)), td('Ukuran', fmtSize(x.size)),
+      td('Lokasi', el('span', { className: `badge b-${x.kind}` }, hl(x.where))), tdAct));
+  }
+  const filteredSize = rows.reduce((a, x) => a + x.size, 0);
+  $('#dtInfo').textContent = rows.length
+    ? `Menampilkan ${startIdx + 1}-${startIdx + view.length} dari ${rows.length}` + (rows.length !== dt.rows.length ? ` (difilter dari ${dt.rows.length})` : '') + `, ${(filteredSize / 1073741824).toFixed(2)} GB`
+    : '';
+
+  const p = $('#dtPager'); p.replaceChildren();
+  if (pages > 1) {
+    const go = (n) => { dt.page = n; renderDt(); $('#recs').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    const pb = (label, n, on = false, dis = false) => { const b = btn(label, () => go(n)); b.classList.toggle('on', on); b.disabled = dis; return b; };
+    p.append(pb('\u2039', dt.page - 1, false, dt.page === 1));
+    const set = new Set([1, pages, dt.page - 1, dt.page, dt.page + 1].filter((n) => n >= 1 && n <= pages));
+    let prev = 0;
+    for (const n of [...set].sort((a, b) => a - b)) {
+      if (n - prev > 1) p.append(el('span', { className: 'muted', textContent: '\u2026', style: 'padding:6px 4px' }));
+      p.append(pb(String(n), n, n === dt.page));
+      prev = n;
+    }
+    p.append(pb('\u203A', dt.page + 1, false, dt.page === pages));
+  }
+  document.querySelectorAll('#page-recordings th.sort').forEach((th) => {
+    th.classList.toggle('asc', th.dataset.k === dt.key && dt.dir === 'asc');
+    th.classList.toggle('desc', th.dataset.k === dt.key && dt.dir === 'desc');
+  });
+  $('#dtSortM').value = `${dt.key}:${dt.dir}`;
+}
+document.querySelectorAll('#page-recordings th.sort').forEach((th) => (th.onclick = () => {
+  if (dt.key === th.dataset.k) dt.dir = dt.dir === 'asc' ? 'desc' : 'asc';
+  else { dt.key = th.dataset.k; dt.dir = th.dataset.k === 'start' || th.dataset.k === 'size' ? 'desc' : 'asc'; }
+  dt.page = 1; renderDt();
+}));
+$('#dtSortM').onchange = () => { [dt.key, dt.dir] = $('#dtSortM').value.split(':'); dt.page = 1; renderDt(); };
+$('#dtSize').onchange = () => { dt.size = Number($('#dtSize').value); dt.page = 1; renderDt(); };
+let dtTimer;
+$('#dtQ').oninput = () => { clearTimeout(dtTimer); dtTimer = setTimeout(() => { dt.q = $('#dtQ').value; dt.page = 1; renderDt(); }, 150); };
+
 async function searchRecs() {
   const from = Math.floor(new Date($('#recFrom').value).getTime() / 1000) || 0;
   const to = Math.floor(new Date($('#recTo').value).getTime() / 1000) || 0;
@@ -383,18 +501,9 @@ async function searchRecs() {
   const q = new URLSearchParams({ location: $('#recLoc').value, camera_id: $('#recCam').value, from, to });
   const recs = await api('/api/recordings?' + q);
   const total = recs.reduce((a, r) => a + r.size, 0);
-  $('#recInfo').textContent = `${recs.length} segmen, ${(total / 1073741824).toFixed(2)} GB` + (recs.length >= 1000 ? ' (dibatasi 1000, persempit rentang waktu)' : '');
-  const t = $('#recs'); t.replaceChildren();
-  if (!recs.length) emptyRow(t, 5, 'Tidak ada rekaman pada rentang waktu ini.');
-  for (const r of recs) {
-    const where = r.local ? (r.uploaded ? 'flashdisk + drive' : 'flashdisk') : 'drive';
-    const kind = r.local ? (r.uploaded ? 'ok' : 'warn') : 'info';
-    const tdAct = el('td', { className: 'actions' }, btn('\u25B6 Putar', () => play(r, where), 'primary'), el('a', { className: 'link', href: `/api/recordings/${r.id}/file`, download: `cam${r.camera_id}_${r.start}.mp4`, textContent: 'Unduh' }));
-    t.append(el('tr', {},
-      td('', fmtTime(r.start)), td('Kamera', camName(r.camera_id)),
-      td('Ukuran', (r.size / 1048576).toFixed(1) + ' MB'), td('Lokasi', badge(r.local && !r.uploaded ? 'flashdisk (antre upload)' : where, kind)),
-      tdAct));
-  }
+  $('#recInfo').textContent = `${recs.length} segmen, ${(total / 1073741824).toFixed(2)} GB` + (recs.length >= 5000 ? ' (dibatasi 5000, persempit rentang waktu)' : '');
+  dt.rows = recs.map(recRow); dt.page = 1;
+  renderDt();
 }
 $('#recSearch').onclick = searchRecs;
 function play(r, where) {
