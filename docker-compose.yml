@@ -10,6 +10,7 @@ services:
       LOCAL_BUFFER_HOURS: ${LOCAL_BUFFER_HOURS:-24}
       RCLONE_REMOTE: ${RCLONE_REMOTE:-}
       RCLONE_CONFIG: /config/rclone.conf
+      RCLONE_DRIVE_USE_TRASH: "false"
     volumes:
       - ./data:/data
       - ./rclone:/config   # berisi rclone.conf (tidak di-commit)
