@@ -49,11 +49,16 @@
       <button>Tambah</button>
     </form>
 
+    <h3>Live</h3>
+    <video id="live" class="hide" controls muted playsinline></video>
+    <p id="liveMsg"></p>
+
     <h3>Rekaman</h3>
     <video id="player" controls></video>
     <table id="recs"></table>
   </section>
 </main>
+<script src="/vendor/hls/hls.min.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const api = async (p, o = {}) => {
@@ -77,6 +82,25 @@ function row(cells) {
 }
 function btn(label, fn) { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; return b; }
 
+let liveHls = null;
+function stopLive() {
+  if (liveHls) { liveHls.destroy(); liveHls = null; }
+  const v = $('#live'); v.pause(); v.removeAttribute('src'); v.load(); v.classList.add('hide');
+}
+function playLive(id, name) {
+  stopLive();
+  const v = $('#live'), url = `/live/cam${id}/index.m3u8`;
+  v.classList.remove('hide'); $('#liveMsg').textContent = 'Live: ' + name + ' (memuat...)';
+  if (window.Hls && Hls.isSupported()) {
+    liveHls = new Hls({ liveSyncDurationCount: 2, manifestLoadingMaxRetry: 6, manifestLoadingRetryDelay: 2000 });
+    liveHls.on(Hls.Events.MANIFEST_PARSED, () => { $('#liveMsg').textContent = 'Live: ' + name; v.play().catch(() => {}); });
+    liveHls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) $('#liveMsg').textContent = 'Live gagal: kamera tidak terjangkau atau codec tidak didukung browser.'; });
+    liveHls.loadSource(url); liveHls.attachMedia(v);
+  } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+    v.src = url; v.play().catch(() => {}); $('#liveMsg').textContent = 'Live: ' + name;
+  } else { $('#liveMsg').textContent = 'Browser tidak mendukung HLS.'; }
+}
+
 let cams = [];
 async function loadCams() {
   cams = await api('/api/cameras');
@@ -85,6 +109,7 @@ async function loadCams() {
     t.append(row([text(c.name), text(c.rtsp_url), text(c.running ? 'merekam' : 'berhenti'),
       btn(c.running ? 'Stop' : 'Start', async () => { await api(`/api/cameras/${c.id}/${c.running ? 'stop' : 'start'}`, { method: 'POST' }); loadCams(); }),
       btn('Hapus', async () => { if (confirm('Hapus kamera?')) { await api(`/api/cameras/${c.id}`, { method: 'DELETE' }); loadCams(); } }),
+      btn('Live', () => playLive(c.id, c.name)),
       btn('Rekaman', () => loadRecs(c.id))]));
   }
 }
@@ -93,7 +118,7 @@ async function loadRecs(camId) {
   const t = $('#recs'); t.replaceChildren();
   for (const r of recs) {
     t.append(row([text(new Date(r.start * 1000).toLocaleString()), text((r.size / 1048576).toFixed(1) + ' MB'), text(r.local ? (r.uploaded ? 'lokal + drive' : 'lokal') : 'drive'),
-      btn('Putar', () => { $('#player').src = `/api/recordings/${r.id}/file`; $('#player').play(); })]));
+      btn('Putar', () => { stopLive(); $('#liveMsg').textContent = ''; $('#player').src = `/api/recordings/${r.id}/file`; $('#player').play(); })]));
   }
 }
 $('#login').onsubmit = async (e) => {

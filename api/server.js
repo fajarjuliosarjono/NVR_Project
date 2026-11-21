@@ -9,6 +9,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 const {
   PORT = '3000',
   RECORDER_URL = 'http://127.0.0.1:8081',
+  MEDIAMTX_HLS_URL = 'http://127.0.0.1:8888',
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD,
   JWT_SECRET,
@@ -88,7 +89,29 @@ app.use(
   }),
 );
 
+// Live view (HLS) dari mediamtx, hanya GET dan wajib login.
+app.use(
+  '/live',
+  requireAuth,
+  (req, res, next) => (req.method === 'GET' ? next() : res.status(405).end()),
+  createProxyMiddleware({
+    target: MEDIAMTX_HLS_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/live': '' },
+    on: {
+      proxyRes: (proxyRes) => {
+        // mediamtx mengarahkan ke /<path>?cookieCheck=1; tambahkan prefix /live agar tetap lewat proxy.
+        const loc = proxyRes.headers.location;
+        if (loc && loc.startsWith('/')) proxyRes.headers.location = '/live' + loc;
+        // Cookie sesi HLS mediamtx tidak diperlukan (tanpa cookie mediamtx tetap melayani playlist).
+        delete proxyRes.headers['set-cookie'];
+      },
+    },
+  }),
+);
+
 const here = path.dirname(fileURLToPath(import.meta.url));
+app.use('/vendor/hls', express.static(path.join(here, 'node_modules/hls.js/dist')));
 app.use(express.static(path.join(here, 'public')));
 
 app.listen(Number(PORT), () => console.log(`api listening on :${PORT}, recorder=${RECORDER_URL}`));

@@ -1,0 +1,35 @@
+# Konfigurasi mediamtx untuk live view (hanya HLS). Path kamera ditambahkan otomatis oleh recorder lewat API.
+# Container ini tidak dipublikasikan ke host; hanya service api/recorder yang bisa mengaksesnya.
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsAlwaysRemux: no
+
+# Protokol lain dimatikan (tidak perlu, mengurangi permukaan serangan).
+rtsp: no
+rtmp: no
+webrtc: no
+srt: no
+moq: no
+
+authMethod: internal
+authInternalUsers:
+  # Siapa pun di jaringan Docker internal boleh membaca stream (akses dari luar dijaga oleh api + login).
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: read
+  # Control API hanya dari jaringan privat (jaringan Docker compose).
+  - user: any
+    pass:
+    ips: ["172.16.0.0/12", "192.168.0.0/16", "10.0.0.0/8"]
+    permissions:
+      - action: api
+
+paths: {}

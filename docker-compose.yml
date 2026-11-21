@@ -10,18 +10,27 @@ services:
       LOCAL_BUFFER_HOURS: ${LOCAL_BUFFER_HOURS:-24}
       RCLONE_REMOTE: ${RCLONE_REMOTE:-}
       RCLONE_CONFIG: /config/rclone.conf
+      MEDIAMTX_API: http://mediamtx:9997
       RCLONE_DRIVE_USE_TRASH: "false"
     volumes:
       - ${DATA_PATH:-./data}:/data
       - ./rclone:/config   # berisi rclone.conf (tidak di-commit)
     # Tidak dipublikasikan ke host: hanya bisa diakses oleh service api.
 
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.4
+    restart: unless-stopped
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    # Tidak dipublikasikan ke host.
+
   api:
     build: ./api
     restart: unless-stopped
-    depends_on: [recorder]
+    depends_on: [recorder, mediamtx]
     environment:
       RECORDER_URL: http://recorder:8081
+      MEDIAMTX_HLS_URL: http://mediamtx:8888
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?isi ADMIN_PASSWORD di .env}
       JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di .env}

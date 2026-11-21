@@ -4,6 +4,7 @@ NVR sederhana: `recorder` (Go + ffmpeg) merekam RTSP ke segmen MP4, `api` (Node.
 
 ```
 browser -> api (Node :3000, auth) -> recorder (Go :8081, ffmpeg, SQLite) -> data/
+                                   -> mediamtx (HLS :8888, live view)
 ```
 
 ## Jalankan lokal
@@ -24,7 +25,7 @@ docker compose up -d --build
 UI di `127.0.0.1:3000`. Pasang reverse proxy HTTPS di depannya dan set `COOKIE_SECURE=true`. Jangan expose port recorder.
 
 ## Konfigurasi recorder
-`DATA_DIR`, `RECORDER_ADDR`, `SEGMENT_SECONDS`, `RETENTION_DAYS`, `MAX_STORAGE_GB`, `LOCAL_BUFFER_HOURS`, `RCLONE_REMOTE`, `RCLONE_BIN`, `FFMPEG_BIN`.
+`DATA_DIR`, `RECORDER_ADDR`, `MEDIAMTX_API`, `SEGMENT_SECONDS`, `RETENTION_DAYS`, `MAX_STORAGE_GB`, `LOCAL_BUFFER_HOURS`, `RCLONE_REMOTE`, `RCLONE_BIN`, `FFMPEG_BIN`.
 
 ## Penyimpanan: buffer lokal + Google Drive (rclone)
 
@@ -136,5 +137,16 @@ Di UI, kolom lokasi rekaman berubah dari `lokal` menjadi `lokal + drive`, dan me
 | `storageQuotaExceeded` | Kuota Drive penuh. Kurangi `RETENTION_DAYS` atau tambah kapasitas. |
 | Rekaman tidak muncul di Drive | Cek log recorder, pastikan `RCLONE_REMOTE` terisi dan `rclone` ada di container (`docker compose exec recorder rclone version`). |
 
+## Live view
+Service `mediamtx` menyajikan live view lewat HLS. Recorder mendaftarkan setiap kamera sebagai path `cam<ID>` lewat Control API mediamtx (dicek ulang tiap 30 detik, jadi pulih otomatis setelah mediamtx restart). Kamera hanya dibuka oleh mediamtx saat ada yang menonton, dan ditutup 20 detik setelah penonton terakhir pergi.
+
+Di UI, klik **Live** pada kamera. Stream diputar lewat `/live/cam<ID>/index.m3u8`, yang wajib login. Port mediamtx tidak dipublikasikan ke host.
+
+Catatan:
+- Latensi sekitar 2 sampai 5 detik (Low-Latency HLS).
+- Live membuka koneksi RTSP kedua ke kamera (selain perekaman). Beberapa kamera murah membatasi jumlah koneksi; jika live gagal, gunakan sub-stream kamera untuk perekaman atau live.
+- Browser hanya bisa memutar H.264 dengan andal. Kamera H.265 umumnya hanya tampil di Safari; ubah codec kamera ke H.264 agar bisa diputar di Chrome/Android.
+- Matikan dengan menghapus `MEDIAMTX_API` dari service recorder.
+
 ## Belum ada
-Live view (rencana: mediamtx + HLS/WebRTC), deteksi gerakan, multi-user.
+Live view WebRTC (latensi < 1 detik), deteksi gerakan, multi-user.

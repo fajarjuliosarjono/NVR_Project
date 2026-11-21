@@ -31,6 +31,7 @@ type Config struct {
 	Remote        string // contoh: gdrive:nvr (kosong = tanpa upload)
 	Rclone        string
 	BufferHours   int
+	MediaMTXAPI   string // contoh: http://mediamtx:9997 (kosong = live view mati)
 }
 
 func env(k, d string) string {
@@ -49,6 +50,7 @@ func loadConfig() Config {
 		Remote:        strings.TrimRight(env("RCLONE_REMOTE", ""), "/"),
 		Rclone:        env("RCLONE_BIN", "rclone"),
 		BufferHours:   buf,
+		MediaMTXAPI:   strings.TrimRight(env("MEDIAMTX_API", ""), "/"),
 		DataDir:       env("DATA_DIR", "./data"),
 		Addr:          env("RECORDER_ADDR", "127.0.0.1:8081"),
 		SegmentSec:    seg,
@@ -82,6 +84,7 @@ type App struct {
 	mu      sync.Mutex
 	cancels map[int64]context.CancelFunc
 	rootCtx context.Context
+	liveMu  sync.Mutex
 }
 
 func maskURL(raw string) string {
@@ -133,7 +136,7 @@ func (a *App) runCamera(ctx context.Context, c Camera) {
 	for ctx.Err() == nil {
 		args := []string{
 			"-hide_banner", "-loglevel", "error",
-			"-rtsp_transport", "tcp", "-rw_timeout", "10000000",
+			"-rtsp_transport", "tcp", "-timeout", "10000000",
 			"-i", c.RTSPURL,
 			"-c", "copy",
 			"-f", "segment", "-segment_time", strconv.Itoa(a.cfg.SegmentSec),
@@ -289,6 +292,7 @@ func (a *App) routes() http.Handler {
 		}
 		in.ID, _ = res.LastInsertId()
 		a.startCamera(in)
+		a.triggerLive()
 		in.RTSPURL = maskURL(in.RTSPURL)
 		in.Running = a.isRunning(in.ID)
 		writeJSON(w, 201, in)
@@ -298,6 +302,7 @@ func (a *App) routes() http.Handler {
 		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		a.stopCamera(id)
 		a.db.Exec(`DELETE FROM cameras WHERE id=?`, id)
+		a.triggerLive()
 		w.WriteHeader(204)
 	})
 
@@ -400,6 +405,7 @@ func main() {
 		a.startCamera(c)
 	}
 	go a.indexLoop(ctx)
+	go a.liveLoop(ctx)
 
 	srv := &http.Server{Addr: cfg.Addr, Handler: a.routes()}
 	go func() {
