@@ -7,13 +7,18 @@
 <style>
   *{box-sizing:border-box}
   body{font-family:system-ui,sans-serif;margin:0;background:#111;color:#eee}
-  header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:#1b1b1b;position:sticky;top:0;z-index:5}
-  header strong{margin-right:8px}
-  nav{display:flex;flex-wrap:wrap;gap:4px;flex:1}
-  nav button{background:none;border:0;color:#bbb;padding:8px 10px;border-radius:6px}
+  #sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:#1b1b1b;display:flex;flex-direction:column;padding:16px 10px;gap:4px;z-index:10;transition:transform .2s}
+  #sidebar strong{font-size:18px;padding:0 10px 12px}
+  nav{display:flex;flex-direction:column;gap:2px;flex:1}
+  nav button{background:none;border:0;color:#bbb;padding:10px 12px;border-radius:6px;text-align:left;margin:0}
+  nav button:hover{background:#262626}
   nav button.active{background:#333;color:#fff}
-  #who{color:#999;font-size:13px}
-  main{padding:16px;max-width:1200px;margin:auto}
+  #who{color:#999;font-size:13px;padding:8px 10px}
+  #logout{margin:0 10px}
+  #topbar{display:none}
+  #backdrop{display:none}
+  main{padding:16px;max-width:1200px;margin:0 auto}
+  body.authed main{margin-left:220px;max-width:none}
   input,select,button{font-size:15px;padding:8px;margin:4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
   button{cursor:pointer}
   button.danger{border-color:#733;color:#f99}
@@ -30,6 +35,14 @@
   #player{width:100%;max-height:60vh;background:#000}
   .msg{color:#9c9;min-height:1.2em}.err{color:#f88}
   .muted{color:#888;font-size:13px}
+  @media (max-width:800px){
+    #sidebar{transform:translateX(-100%)}
+    body.menu-open #sidebar{transform:none}
+    body.menu-open #backdrop{display:block;position:fixed;inset:0;background:#0008;z-index:9}
+    body.authed #topbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1b1b1b;position:sticky;top:0;z-index:5}
+    #topbar button{margin:0;font-size:20px;padding:4px 12px}
+    body.authed main{margin-left:0}
+  }
   @media (max-width:640px){
     main{padding:10px}
     .grid{grid-template-columns:1fr}
@@ -44,9 +57,11 @@
 </style>
 </head>
 <body>
-<header>
+<div id="topbar"><button id="menuBtn" aria-label="Menu">&#9776;</button><strong id="pageTitle">NVR</strong></div>
+<div id="backdrop"></div>
+<aside id="sidebar" class="hide">
   <strong>NVR</strong>
-  <nav id="nav" class="hide">
+  <nav id="nav">
     <button data-page="dashboard">Dashboard</button>
     <button data-page="recordings">Rekaman</button>
     <button data-page="cameras" data-admin>Kamera</button>
@@ -54,8 +69,8 @@
     <button data-page="password">Ganti Password</button>
   </nav>
   <span id="who"></span>
-  <button id="logout" class="hide">Keluar</button>
-</header>
+  <button id="logout">Keluar</button>
+</aside>
 <main>
   <form id="login" class="hide" style="max-width:360px">
     <h3>Masuk</h3>
@@ -152,7 +167,7 @@ const camName = (id) => (cams.find((c) => c.id === id) || {}).name || ('#' + id)
 function showLogin() {
   me = null; stopAllLive();
   document.querySelectorAll('.page').forEach((p) => p.classList.add('hide'));
-  ['#nav', '#logout'].forEach((s) => $(s).classList.add('hide'));
+  $('#sidebar').classList.add('hide'); document.body.classList.remove('authed', 'menu-open');
   $('#who').textContent = ''; $('#login').classList.remove('hide');
 }
 function go(page) {
@@ -160,17 +175,21 @@ function go(page) {
   if (document.querySelector(`nav [data-page="${page}"][data-admin]`) && me.role !== 'admin') page = 'dashboard';
   if (location.hash.slice(1) !== page) history.replaceState(null, '', '#' + page);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.page === page));
+  $('#pageTitle').textContent = document.querySelector(`nav [data-page="${page}"]`)?.textContent || 'NVR';
+  document.body.classList.remove('menu-open');
   document.querySelectorAll('.page').forEach((p) => p.classList.toggle('hide', p.id !== 'page-' + page));
   if (page !== 'dashboard') stopAllLive();
   if (page !== 'recordings') { $('#player').pause(); }
   ({ dashboard: loadDashboard, recordings: initRecordings, cameras: loadCams, users: loadUsers, password: () => {} })[page]?.();
 }
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => go(b.dataset.page)));
+$('#menuBtn').onclick = () => document.body.classList.toggle('menu-open');
+$('#backdrop').onclick = () => document.body.classList.remove('menu-open');
 
 async function start() {
   try { me = await api('/auth/me'); } catch { return showLogin(); }
   $('#login').classList.add('hide');
-  ['#nav', '#logout'].forEach((s) => $(s).classList.remove('hide'));
+  $('#sidebar').classList.remove('hide'); document.body.classList.add('authed');
   document.querySelectorAll('nav [data-admin]').forEach((b) => b.classList.toggle('hide', me.role !== 'admin'));
   $('#who').textContent = `${me.user} (${me.role === 'admin' ? 'full akses' : 'read only'})`;
   cams = await api('/api/cameras').catch(() => []);
